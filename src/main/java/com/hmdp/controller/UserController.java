@@ -11,6 +11,7 @@ import com.hmdp.entity.User;
 import com.hmdp.entity.UserInfo;
 import com.hmdp.service.IUserInfoService;
 import com.hmdp.service.IUserService;
+import com.hmdp.service.impl.UserServiceImpl;
 import com.hmdp.utils.RegexUtils;
 import com.hmdp.utils.SystemConstants;
 import com.hmdp.utils.UserHolder;
@@ -18,6 +19,9 @@ import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpSession;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import javax.management.Query;
@@ -44,6 +48,7 @@ public class UserController {
     @Resource
     private IUserInfoService userInfoService;
 
+
     /**
      * 发送手机验证码
      */
@@ -59,32 +64,11 @@ public class UserController {
      */
     @PostMapping("/login")
     public Result login(@RequestBody LoginFormDTO loginForm, HttpSession session){
-        String phone = loginForm.getPhone();
-        String code = loginForm.getCode();
-        Object cachecode = session.getAttribute("code");
-        if(RegexUtils.isPhoneInvalid(phone)){
-            return Result.fail("手机号错误");
-        }
-        if(!code.equals(cachecode.toString())||cachecode==null){
-            return Result.fail("验证码错误");
-        }
-        User user = userService.getOne(new QueryWrapper<User>().eq("phone", phone));
-        if(user==null){
-            user = createUserWithPhone(phone);
-        }
-        UserDTO userDTO = new UserDTO();
-        BeanUtils.copyProperties(user, userDTO);
-        session.setAttribute("user", userDTO);
-        return Result.ok();
+        return userService.login(loginForm, session);
+
     }
 
-    private User createUserWithPhone(String phone) {
-        User user = new User();
-        user.setPhone(phone);
-        user.setNickName(SystemConstants.USER_NICK_NAME_PREFIX + RandomUtil.randomString(6));
-        save(user);
-        return user;
-    }
+
 
     /**
      * 登出功能
