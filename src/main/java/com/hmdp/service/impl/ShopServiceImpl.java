@@ -7,6 +7,7 @@ import com.hmdp.entity.Shop;
 import com.hmdp.mapper.ShopMapper;
 import com.hmdp.service.IShopService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.hmdp.utils.CacheClient;
 import com.hmdp.utils.RedisConstants;
 import com.hmdp.utils.RedisData;
 import jakarta.annotation.Resource;
@@ -34,11 +35,13 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
     @Resource
     private StringRedisTemplate stringRedisTemplate;
 
+    @Resource
+    private CacheClient cacheClient;
     private static final ExecutorService executorService = Executors.newFixedThreadPool(10);//获取线程池
     @Override
     public Object queryById(Long id) {
-        return queryByIdWithMutex(id);
-        //return queryByIdWithPassThrough(id);
+        //return queryByIdWithMutex(id);
+        return cacheClient.queryByIdWithPassThrough(id, Shop.class, CACHE_SHOP_KEY, this::getById, RedisConstants.CACHE_SHOP_TTL, TimeUnit.MINUTES);
     }
 
 
