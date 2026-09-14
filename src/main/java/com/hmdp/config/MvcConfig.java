@@ -18,7 +18,7 @@ public class MvcConfig implements WebMvcConfigurer {
         registry.addInterceptor(new LoginInterceptor())
                 .excludePathPatterns(
                         "/shop/**",
-                        "/voucher/**",
+                        "/voucher/**",//方便测试,解除了优惠券的拦截
                         "/shop-type/**",
                         "/upload/**",
                         "/blog/hot",
