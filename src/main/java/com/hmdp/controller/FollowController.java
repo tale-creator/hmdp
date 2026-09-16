@@ -34,4 +34,6 @@ public class FollowController {
     public Result common(@PathVariable("id") Long userId){
         return followService.common(userId);
     }
+
+
 }

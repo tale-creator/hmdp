@@ -7,18 +7,24 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.hmdp.dto.Result;
 import com.hmdp.dto.UserDTO;
 import com.hmdp.entity.Blog;
+import com.hmdp.entity.Follow;
+import com.hmdp.entity.ScrollList;
 import com.hmdp.entity.User;
 import com.hmdp.mapper.BlogMapper;
 import com.hmdp.service.IBlogService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.hmdp.service.IFollowService;
 import com.hmdp.service.IUserService;
 import com.hmdp.utils.SystemConstants;
 import com.hmdp.utils.UserHolder;
 import jakarta.annotation.Resource;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -29,7 +35,8 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
     private IUserService userService;
     @Resource
     private StringRedisTemplate stringRedisTemplate;
-
+    @Resource
+    private IFollowService followService;
     @Override
     public Result queryBlogById(Long id) {
         Blog blog = getById(id);
@@ -86,10 +93,7 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
         UserDTO currentUser = UserHolder.getUser();
 
         records.forEach(blog ->{
-            Long blogUserId = blog.getUserId();
-            User user = userService.getById(blogUserId);
-            blog.setName(user.getNickName());
-            blog.setIcon(user.getIcon());
+            queryBlogUser(blog);
 
             // 判断是否点亮：用“当前看文章的人”去查，Key是 like:blogId
             if(currentUser != null) {
@@ -99,6 +103,13 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
             }
         });
         return Result.ok(records);
+    }
+
+    private void queryBlogUser(Blog blog) {
+        Long blogUserId = blog.getUserId();
+        User user = userService.getById(blogUserId);
+        blog.setName(user.getNickName());
+        blog.setIcon(user.getIcon());
     }
 
     @Override
@@ -122,5 +133,60 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
                 .collect(Collectors.toList());
         return Result.ok(users);
     }
+
+    @Override
+    public Result saveBlog(Blog blog) {
+        UserDTO user = UserHolder.getUser();
+        blog.setUserId(user.getId());
+        boolean save = save(blog);
+        if(save) {
+            List<Follow> follow = followService.query().eq("follow_user_id", user.getId()).list();
+            for (Follow f : follow) {
+                stringRedisTemplate.opsForZSet().add("feed"+f.getUserId(), blog.getId().toString(), System.currentTimeMillis());
+            }
+
+        }
+        return Result.ok(blog.getId());
+    }
+
+    @Override
+    public Result scrollList(Long max, Integer offset) {
+        // 1. 分页查询
+        UserDTO user = UserHolder.getUser();
+        Set<ZSetOperations.TypedTuple<String>> set = stringRedisTemplate.opsForZSet().reverseRangeByScoreWithScores("feed" + user.getId(), 0, max, offset, 2);
+        if(set==null|| set.isEmpty()) return Result.ok();
+        //2.解析数据
+        // 4. 解析数据: blogId、minTime (时间戳)、offset
+        List<Long> ids = new ArrayList<>(set.size());
+        long minTime = 0; // 2
+        int os = 1; // 2
+        for (ZSetOperations.TypedTuple<String> tuple : set) { // 5 4 4 2 2
+            // 4.1. 获取id
+            ids.add(Long.valueOf(Objects.requireNonNull(tuple.getValue())));
+            // 4.2. 获取分数(时间戳)
+            long time = Objects.requireNonNull(tuple.getScore()).longValue();
+            if(time == minTime){
+                os++;
+            }else{
+                minTime = time;
+                os = 1;
+            }
+        }
+        String idslist = StrUtil.join(",", ids);
+        List<Blog> blogs = query().in("id", ids)
+                .last("order by field(id, " + idslist + ")")
+                .list();
+        for (Blog blog : blogs) {
+            queryBlogUser(blog);
+            queryBlogLikes(blog.getId());
+        }
+        ScrollList scrollList = new ScrollList(blogs, minTime, os);
+        return Result.ok(scrollList);
+
+    }
+
+
+
+
 }
 
