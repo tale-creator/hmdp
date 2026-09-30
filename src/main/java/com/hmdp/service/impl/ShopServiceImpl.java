@@ -178,6 +178,11 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
 
     }
 
+    @Override
+    public Result queryShopByType(Integer typeId, Integer current, Double x, Double y) {
+        return null;
+    }
+
     public boolean getlock(String key){
         return stringRedisTemplate.opsForValue().setIfAbsent(key,"1",RedisConstants.LOCK_SHOP_TTL, TimeUnit.MINUTES);
     }
