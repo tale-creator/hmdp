@@ -1,0 +1,9 @@
+# 个人本地配置模板。
+# 用法：复制一份改名为 application-local.yaml，填入自己的 Key。
+# application-local.yaml 已被 .gitignore 忽略，不会提交到仓库。
+#
+# 注意：把不需要的项整行注释掉，不要留 api-key: "" 这种空值，
+# 空值会覆盖掉环境变量 HMD_AI_API_KEY。
+hmdp:
+  ai:
+    api-key: "sk-你的百炼key"

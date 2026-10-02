@@ -15,6 +15,7 @@ import com.hmdp.service.IBlogService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmdp.service.IFollowService;
 import com.hmdp.service.IUserService;
+import com.hmdp.service.KnowledgeBaseService;
 import com.hmdp.utils.SystemConstants;
 import com.hmdp.utils.UserHolder;
 import jakarta.annotation.Resource;
@@ -37,6 +38,9 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
     private StringRedisTemplate stringRedisTemplate;
     @Resource
     private IFollowService followService;
+    @Resource
+    private KnowledgeBaseService knowledgeBaseService;
+
     @Override
     public Result queryBlogById(Long id) {
         Blog blog = getById(id);
@@ -144,7 +148,8 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
             for (Follow f : follow) {
                 stringRedisTemplate.opsForZSet().add("feed"+f.getUserId(), blog.getId().toString(), System.currentTimeMillis());
             }
-
+            // 把这篇博客切分向量化，加进作者自己的知识库（异步，失败不影响发布）
+            knowledgeBaseService.indexBlog(blog);
         }
         return Result.ok(blog.getId());
     }

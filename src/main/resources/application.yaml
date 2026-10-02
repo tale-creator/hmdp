@@ -3,6 +3,10 @@ server:
 spring:
   application:
     name: hmdp
+  # 个人配置（API Key 等）放在 application-local.yaml，该文件已被 gitignore，不会提交
+  # 文件缺失也不报错，此时 api-key 回退到下面的环境变量写法
+  profiles:
+    active: local
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://127.0.0.1:3306/hmdp?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
@@ -22,8 +26,43 @@ spring:
         time-between-eviction-runs: 10s
   jackson:
     default-property-inclusion: non_null # JSON处理时忽略非空字段
+  servlet:
+    multipart:
+      max-file-size: 10MB # 知识库上传文件上限
+      max-request-size: 10MB
 mybatis-plus:
   type-aliases-package: com.hmdp.entity # 别名扫描包
 logging:
   level:
     com.hmdp: debug
+# ==================== RAG 知识库问答 ====================
+# 接口按 OpenAI 兼容格式调用，换服务商只要改 base-url / chat-model / embedding-model
+hmdp:
+  ai:
+    enabled: true
+    # 阿里云百炼（通义千问）兼容模式
+    base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
+    # 优先用 application-local.yaml 里配置的值（该文件不会被提交）
+    # 也可以改用环境变量 HMD_AI_API_KEY 注入
+    api-key: ${HMD_AI_API_KEY:}
+    chat-model: qwen-plus
+    embedding-model: text-embedding-v3
+    # 0 = 不传 dimensions，由服务端决定维度
+    embedding-dimensions: 0
+    # 单次 embedding 请求最多几条（百炼限制 10）
+    embedding-batch-size: 10
+    timeout: 60000
+    # 检索参数
+    top-k: 5
+    # 向量模式的余弦相似度阈值
+    min-score: 0.25
+    # 关键词兜底模式单独一套阈值（量纲不同，不能复用 min-score）
+    keyword-min-score: 0.08
+    max-candidates: 2000
+    # 分片参数
+    chunk-size: 400
+    chunk-overlap: 60
+    max-context-chars: 3000
+    temperature: 0.3
+    # 最多带最近几轮对话作为上下文，0 = 每次提问独立
+    max-history-turns: 4
